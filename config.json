@@ -1,0 +1,15 @@
+{
+  "TARGET_COUNT": 50,
+  "VIEW_MODE": "table",
+  "MAX_SCROLL": 20,
+  "APPLY_UI_FILTERS": false,
+  "POST_FILTER": true,
+  "FILTER": {
+    "tagsInclude": ["商家投千川", "高结算率"],
+    "monthlySalesMin": 0,
+    "commissionMin": 0,
+    "shopScoreMin": 0,
+    "goodReviewMin": 0,
+    "shortVideoPush": false
+  }
+}
