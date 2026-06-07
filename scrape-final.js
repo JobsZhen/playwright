@@ -513,12 +513,14 @@ async (page) => {
   };
 
   // 主流程（playwright-cli 连接到用户已打开的浏览器，所以不需要导航和登录检查）
-  if (CONFIG.VIEW_MODE === 'table') {
-    await switchToTableView();
-  }
 
   if (CONFIG.APPLY_UI_FILTERS) {
     await applyFilters();
+  }
+
+  // 筛选完成后检查视图模式
+  if (CONFIG.VIEW_MODE === 'table') {
+    await switchToTableView();
   }
 
   const allProducts = [];
