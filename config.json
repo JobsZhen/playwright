@@ -4,6 +4,7 @@
   "MAX_SCROLL": 20,
   "APPLY_UI_FILTERS": true,
   "POST_FILTER": true,
+  "ADD_TO_CART": false,
   "FILTER": {
     "tagsInclude": ["商家投千川", "高结算率"],
     "estimatedEarningMin": 1,

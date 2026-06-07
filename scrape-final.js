@@ -451,6 +451,67 @@ async (page) => {
     return filtered;
   };
 
+  // 关闭可能出现的弹窗（点击"我知道了"按钮）
+  const dismissModal = async () => {
+    await page.evaluate(() => {
+      const allEls = document.querySelectorAll('*');
+      for (const el of allEls) {
+        if (el.textContent.trim() === '我知道了' && el.offsetParent !== null) {
+          el.click();
+          return;
+        }
+      }
+    });
+    await page.waitForTimeout(300);
+  };
+
+  // 为符合条件的商品点击"加选品车"按钮
+  const clickAddToCartForProducts = async (products) => {
+    filterResults.push('--- 开始加选品车（' + products.length + ' 件）---');
+    const clickedTitles = new Set();
+
+    for (const product of products) {
+      if (!product.title || clickedTitles.has(product.title)) continue;
+
+      const result = await page.evaluate((title) => {
+        const rows = document.querySelectorAll('.auxo-table-row-level-0');
+        for (const row of rows) {
+          // 通过标题匹配行
+          const textEls = row.querySelectorAll('[elementtiming="element-timing"]');
+          let rowMatches = false;
+          for (const el of textEls) {
+            if (el.textContent.trim() === title.trim()) {
+              rowMatches = true;
+              break;
+            }
+          }
+          if (!rowMatches) continue;
+
+          // 在该行查找"加选品车"按钮/链接
+          const allEls = row.querySelectorAll('*');
+          for (const el of allEls) {
+            if (el.textContent.trim() === '加选品车' && el.children.length === 0) {
+              el.click();
+              return 'clicked: ' + title.slice(0, 30);
+            }
+          }
+          return 'button not found in row: ' + title.slice(0, 30);
+        }
+        return 'row not found (may be scrolled out): ' + title.slice(0, 30);
+      }, product.title);
+
+      filterResults.push('  ' + result);
+      clickedTitles.add(product.title);
+
+      if (result.includes('clicked')) {
+        await page.waitForTimeout(800);
+        await dismissModal();
+      }
+    }
+
+    filterResults.push('--- 加选品车完成 ---');
+  };
+
   // 主流程（playwright-cli 连接到用户已打开的浏览器，所以不需要导航和登录检查）
   if (CONFIG.VIEW_MODE === 'table') {
     await switchToTableView();
@@ -529,6 +590,17 @@ async (page) => {
       }
       finalProducts = filterProducts(allProducts).slice(0, CONFIG.TARGET_COUNT);
     }
+  }
+
+  // 加选品车：回到顶部后逐个点击符合条件商品的按钮
+  if (CONFIG.ADD_TO_CART && finalProducts.length > 0) {
+    await page.evaluate(() => {
+      const container = document.getElementById('portal');
+      if (container) container.scrollTop = 0;
+      else window.scrollTo(0, 0);
+    });
+    await page.waitForTimeout(1500);
+    await clickAddToCartForProducts(finalProducts);
   }
 
   finalProducts.forEach((p, i) => p.index = i + 1);
