@@ -256,6 +256,7 @@ if (rawOutput.startsWith('"') && rawOutput.endsWith('"')) {
 }
 
 let data;
+let filterLog = [];
 try {
     // 解析外层 JSON
     const parsed = JSON.parse(jsonStr);
@@ -267,6 +268,12 @@ try {
         data = parsed;
     }
 
+    // 支持新的返回格式 {products: [...], filterLog: [...]}
+    if (data && data.products && Array.isArray(data.products)) {
+        filterLog = data.filterLog || [];
+        data = data.products;
+    }
+
     // 确保 data 是数组
     if (!Array.isArray(data)) {
         throw new Error('解析结果不是数组');
@@ -275,6 +282,13 @@ try {
     console.error('错误: 解析JSON失败 -', e.message);
     console.error('尝试解析的内容:', jsonStr.substring(0, 200));
     process.exit(1);
+}
+
+// 显示筛选器执行日志
+if (filterLog.length > 0) {
+    console.log('\n--- 筛选器执行日志 ---');
+    filterLog.forEach(line => console.log(line));
+    console.log('--- 筛选器日志结束 ---\n');
 }
 
 // ============ 保存文件 ============

@@ -52,85 +52,121 @@ async (page) => {
     }
   };
 
+  const filterResults = [];
+
   const applyFilters = async () => {
-    console.log('--- 开始应用筛选条件 ---');
+    filterResults.push('--- 开始应用筛选条件 ---');
 
     const clickFilterBox = async (filterName) => {
       try {
         const result = await page.evaluate((name) => {
           const all = document.querySelectorAll('[class*="index_module"]');
+          let bestMatch = null;
+          let bestLength = Infinity;
           for (const el of all) {
+            // 精确匹配：元素文本恰好等于目标名称
             if (el.textContent.trim() === name) {
-              const box = el.querySelector('.index_module__box____17c1') || el.parentElement.querySelector('.index_module__box____17c1');
-              if (box) {
-                box.click();
-                return 'clicked ' + name;
+              // 优先选最短文本的（最小/叶子节点元素）
+              const textLen = el.textContent.length;
+              if (textLen < bestLength) {
+                bestLength = textLen;
+                bestMatch = el;
               }
             }
           }
-          return 'not found: ' + name;
+          if (bestMatch) {
+            const box = bestMatch.querySelector('.index_module__box____17c1');
+            if (box) { box.click(); return 'clicked box: ' + name; }
+            bestMatch.click();
+            return 'clicked element: ' + name;
+          }
+          const texts = Array.from(all).map(e => e.textContent.trim()).filter(t => t && t.length < 15);
+          return 'not found: ' + name + ' | available: ' + texts.join(', ');
         }, filterName);
-        await page.waitForTimeout(500);
-        console.log('  ' + result);
+        await page.waitForTimeout(800);
+        filterResults.push('  ' + result);
+        return result.includes('clicked');
       } catch (e) {
-        console.log('  点击 ' + filterName + ' 失败：' + e.message);
+        filterResults.push('  点击 ' + filterName + ' 失败：' + e.message);
+        return false;
       }
     };
 
     const selectDropdownOption = async (optionText) => {
       try {
+        await page.waitForTimeout(1000);
         const result = await page.evaluate((text) => {
           const dropdowns = document.querySelectorAll('.auxo-select-dropdown');
-          const visible = Array.from(dropdowns).filter(d => d.offsetParent !== null)[0];
-          if (!visible) return 'no visible dropdown';
-          const allEls = visible.querySelectorAll('*');
+          const visible = Array.from(dropdowns).filter(d => d.offsetParent !== null);
+          if (visible.length === 0) return 'no visible dropdown';
+          const allEls = visible[0].querySelectorAll('*');
           for (const el of allEls) {
             if (el.textContent.trim() === text && el.children.length === 0) {
               el.click();
-              return 'clicked ' + text;
+              return 'clicked: ' + text;
             }
           }
-          return 'option not found: ' + text;
+          const options = Array.from(allEls)
+            .filter(e => e.children.length === 0 && e.textContent.trim())
+            .map(e => e.textContent.trim())
+            .slice(0, 10);
+          return 'option not found: ' + text + ' | available: ' + options.join(', ');
         }, optionText);
         await page.waitForTimeout(500);
-        console.log('    ' + result);
+        filterResults.push('    ' + result);
+        return result.includes('clicked');
       } catch (e) {
-        console.log('    选择 ' + optionText + ' 失败：' + e.message);
+        filterResults.push('    选择 ' + optionText + ' 失败：' + e.message);
+        return false;
       }
+    };
+
+    // 点击页面空白区域关闭当前下拉菜单
+    const closeCurrentDropdown = async () => {
+      await page.evaluate(() => {
+        const backdrop = document.querySelector('.auxo-picker-backdrop') ||
+                         document.querySelector('[class*="backdrop"]') ||
+                         document.querySelector('[class*="mask"]');
+        if (backdrop) { backdrop.click(); return 'clicked backdrop'; }
+        // 没有遮罩层时，点击 body 的空白位置
+        document.body.click();
+        return 'clicked body';
+      });
+      await page.waitForTimeout(500);
     };
 
     const F = CONFIG.FILTER;
 
-    console.log('[带货情况]');
+    filterResults.push('[带货情况]');
     if (F.monthlySalesMin > 0) {
-      await clickFilterBox('月销');
-      await selectDropdownOption('≥1000');
+      const clicked = await clickFilterBox('月销');
+      if (clicked) { await selectDropdownOption('≥1000'); await closeCurrentDropdown(); }
     }
 
-    console.log('[商品信息]');
+    filterResults.push('[商品信息]');
     if (F.commissionMin || F.commissionMax) {
-      await clickFilterBox('佣金区间');
-      await selectDropdownOption('10%-20%');
+      const clicked = await clickFilterBox('佣金区间');
+      if (clicked) { await selectDropdownOption('10%-20%'); await closeCurrentDropdown(); }
     }
 
     if (F.shopScoreMin > 0) {
-      await clickFilterBox('商家体验分');
-      await selectDropdownOption('90 分以上');
+      const clicked = await clickFilterBox('商家体验分');
+      if (clicked) { await selectDropdownOption('90分以上'); await closeCurrentDropdown(); }
     }
 
     if (F.goodReviewMin > 0) {
-      await clickFilterBox('好评率');
-      await selectDropdownOption('≥90%');
+      const clicked = await clickFilterBox('好评率');
+      if (clicked) { await selectDropdownOption('≥90%'); await closeCurrentDropdown(); }
     }
 
     if (F.shortVideoPush) {
-      await clickFilterBox('服务与权益');
-      await selectDropdownOption('短视频随心推');
+      const clicked = await clickFilterBox('服务与权益');
+      if (clicked) { await selectDropdownOption('短视频随心推'); await closeCurrentDropdown(); }
     }
 
-    console.log('等待筛选结果加载...');
+    filterResults.push('等待筛选结果加载...');
     await page.waitForTimeout(2000);
-    console.log('--- 筛选条件应用完成 ---\n');
+    filterResults.push('--- 筛选条件应用完成 ---');
   };
 
   const extractTableProducts = async () => {
@@ -386,10 +422,28 @@ async (page) => {
     const F = CONFIG.FILTER;
 
     const filtered = products.filter(p => {
+      // 标签过滤：包含任一指定标签
       if (F.tagsInclude && F.tagsInclude.length > 0 && p.tags) {
         const hasRequiredTag = F.tagsInclude.some(tag => p.tags.includes(tag));
         if (!hasRequiredTag) return false;
       }
+
+      // 预估收益过滤：≥ 指定金额
+      if (F.estimatedEarningMin) {
+        const earning = parseFloat(p.estimatedEarning);
+        if (!earning || earning < F.estimatedEarningMin) return false;
+      }
+
+      // 带货达人数/销量比例过滤
+      if (F.salesConversionMin) {
+        const sellerCount = parseInt((p.sellerCount || '').replace(/,/g, ''));
+        const salesVolume = parseInt((p.salesVolume || '').replace(/[,.万]/g, '').replace(/万/, '0000'));
+        if (sellerCount && salesVolume) {
+          const ratio = (sellerCount / salesVolume) * 100;
+          if (ratio <= F.salesConversionMin) return false;
+        }
+      }
+
       return true;
     });
 
@@ -494,5 +548,5 @@ async (page) => {
     });
   }
 
-  return JSON.stringify(finalProducts);
+  return JSON.stringify({products: finalProducts, filterLog: filterResults});
 }

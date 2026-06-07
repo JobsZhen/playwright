@@ -72,6 +72,7 @@ build/
 # ===========================
 # 缓存文件
 # ===========================
+data/
 .cache/
 .eslintcache
 .stylelintcache
