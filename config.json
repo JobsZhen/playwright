@@ -2,14 +2,18 @@
   "TARGET_COUNT": 50,
   "VIEW_MODE": "table",
   "MAX_SCROLL": 20,
-  "APPLY_UI_FILTERS": false,
+  "APPLY_UI_FILTERS": true,
   "POST_FILTER": true,
+  "ADD_TO_CART": false,
   "FILTER": {
     "tagsInclude": ["商家投千川", "高结算率"],
-    "monthlySalesMin": 0,
-    "commissionMin": 0,
-    "shopScoreMin": 0,
-    "goodReviewMin": 0,
-    "shortVideoPush": false
+    "estimatedEarningMin": 1,
+    "monthlySalesMin": 1000,
+    "commissionMin": 10,
+    "commissionMax": 20,
+    "shopScoreMin": 90,
+    "goodReviewMin": 90,
+    "shortVideoPush": true,
+    "salesConversionMin": 10
   }
 }

@@ -30,6 +30,10 @@ for (let i = 0; i < args.length; i++) {
             options.uiFilter = true; break;
         case '--no-ui-filter':
             options.uiFilter = false; break;
+        case '-a': case '--add-to-cart':
+            options.addToCart = true; break;
+        case '--no-add-to-cart':
+            options.addToCart = false; break;
         case '-t': case '--tags':
             options.tags = args[++i]; break;
         case '-o': case '--output':
@@ -63,6 +67,8 @@ if (options.help) {
   -F, --no-filter           禁用数据后处理过滤
   --ui-filter               启用页面UI筛选器
   --no-ui-filter            禁用页面UI筛选器
+  -a, --add-to-cart         自动点击符合条件商品的"加选品车"按钮
+  --no-add-to-cart          禁用"加选品车"功能
   -t, --tags <标签1,标签2>  标签过滤，逗号分隔 (OR关系)
   -o, --output <名称>       输出文件名前缀 (不含扩展名)
   --no-csv                  不生成CSV文件
@@ -73,6 +79,7 @@ if (options.help) {
   node run.js -n 100                   # 爬取100条
   node run.js -m grid -t "高结算率"    # 卡片视图，按标签过滤
   node run.js --ui-filter -n 50       # 启用页面筛选器
+  node run.js --ui-filter -a -n 10    # 启用筛选并自动加选品车
   node run.js -n 30 -o my_products    # 自定义输出文件名
 
 配置文件:
@@ -112,6 +119,7 @@ if (options.mode !== undefined) config.VIEW_MODE = options.mode;
 if (options.scroll !== undefined) config.MAX_SCROLL = options.scroll;
 if (options.filter !== undefined) config.POST_FILTER = options.filter;
 if (options.uiFilter !== undefined) config.APPLY_UI_FILTERS = options.uiFilter;
+if (options.addToCart !== undefined) config.ADD_TO_CART = options.addToCart;
 if (options.tags !== undefined) {
     if (!config.FILTER) config.FILTER = {};
     config.FILTER.tagsInclude = options.tags.split(',').map(t => t.trim());
@@ -129,6 +137,7 @@ console.log('  视图模式:', config.VIEW_MODE);
 console.log('  最大滚动:', config.MAX_SCROLL);
 console.log('  UI筛选器:', config.APPLY_UI_FILTERS ? '启用' : '禁用');
 console.log('  数据过滤:', config.POST_FILTER ? '启用' : '禁用');
+console.log('  加选品车:', config.ADD_TO_CART ? '启用' : '禁用');
 if (config.FILTER && config.FILTER.tagsInclude) {
     console.log('  标签过滤:', config.FILTER.tagsInclude.join(', '));
 }
@@ -256,6 +265,7 @@ if (rawOutput.startsWith('"') && rawOutput.endsWith('"')) {
 }
 
 let data;
+let filterLog = [];
 try {
     // 解析外层 JSON
     const parsed = JSON.parse(jsonStr);
@@ -267,6 +277,12 @@ try {
         data = parsed;
     }
 
+    // 支持新的返回格式 {products: [...], filterLog: [...]}
+    if (data && data.products && Array.isArray(data.products)) {
+        filterLog = data.filterLog || [];
+        data = data.products;
+    }
+
     // 确保 data 是数组
     if (!Array.isArray(data)) {
         throw new Error('解析结果不是数组');
@@ -275,6 +291,13 @@ try {
     console.error('错误: 解析JSON失败 -', e.message);
     console.error('尝试解析的内容:', jsonStr.substring(0, 200));
     process.exit(1);
+}
+
+// 显示筛选器执行日志
+if (filterLog.length > 0) {
+    console.log('\n--- 筛选器执行日志 ---');
+    filterLog.forEach(line => console.log(line));
+    console.log('--- 筛选器日志结束 ---\n');
 }
 
 // ============ 保存文件 ============
